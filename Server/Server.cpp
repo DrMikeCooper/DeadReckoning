@@ -2,6 +2,7 @@
 #include <string>
 #include <BitStream.h>
 #include <thread>
+#include <vector>
 
 #include "Server.h"
 #include "GameMessages.h"
@@ -19,6 +20,7 @@ void Server::StartUp()
 
 	//Startup a thread to ping clients every second
 	std::thread pingThread(SendClientPing, pPeerInterface);
+	std::thread updateThread(UpdateThread, this, pPeerInterface);
 
 	HandleNetworkMessages();
 }
@@ -87,6 +89,9 @@ void Server::HandleNetworkMessages()
 
 				break;
 			}
+			case ID_CLIENT_SPAWN_BULLET:
+				OnSpawnBullet(packet);
+				break;
 			default:
 				std::cout << "Received a message with a unknown id: " <<
 					packet->data[0];
@@ -94,6 +99,16 @@ void Server::HandleNetworkMessages()
 			}
 		}
 	}
+}
+
+void Server::OnSpawnBullet(RakNet::Packet* packet)
+{
+	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	bsIn.IgnoreBytes(sizeof(RakNet::MessageID));
+	glm::vec3 pos, vel;
+	bsIn.Read((char*)&pos, sizeof(glm::vec3));
+	bsIn.Read((char*)&vel, sizeof(glm::vec3));
+	SpawnObject(pos, vel);
 }
 
 void Server::SendClientPing(RakNet::RakPeerInterface* pPeerInterface)
@@ -107,4 +122,52 @@ void Server::SendClientPing(RakNet::RakPeerInterface* pPeerInterface)
 			RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 		std::this_thread::sleep_for(std::chrono::seconds(60));
 	}
+}
+
+void Server::UpdateThread(Server* server, RakNet::RakPeerInterface* pPeerInterface)
+{
+	const int deltaTime = 17;
+	while (true)
+	{
+		std::vector<int> deathRow;
+		// every 60 seconds update all gameObjects
+		for (int i = 0; i < server->m_gameObjects.size(); i++)
+		{
+			server->m_gameObjects[i].Update(deltaTime*0.001f);
+
+			//check for despawn
+			glm::vec3 pos = server->m_gameObjects[i].data.position;
+			if (pos.x < -10 || pos.x > 10 || pos.z < -10 || pos.z > 10)
+				deathRow.push_back(server->m_gameObjects[i].id);
+
+			// broadcast to every client if we're server controlled
+			if (server->m_gameObjects[i].id >= 1000)
+				server->m_gameObjects[i].Write(pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+		}
+
+		for (int i = 0; i < deathRow.size(); i++)
+			server->Despawn(deathRow[i]);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(17));
+	}
+}
+
+void Server::SpawnObject(glm::vec3 position, glm::vec3 velocity)
+{
+	m_gameObjects[nextServerID] = GameObject();
+	m_gameObjects[nextServerID].id = nextServerID;
+	m_gameObjects[nextServerID].data.position = position;
+	m_gameObjects[nextServerID].data.velocity = velocity;
+	nextServerID++;
+}
+
+void Server::Despawn(int id)
+{
+	RakNet::BitStream bs;
+	bs.Write((RakNet::MessageID)GameMessages::ID_SERVER_DESPAWN);
+	bs.Write(id);
+	pPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+
+	// erase from our local list
+	m_gameObjects.erase(id);
 }

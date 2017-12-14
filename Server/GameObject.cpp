@@ -55,8 +55,12 @@ void GameObject::Update(float dt)
 #ifndef NETWORK_SERVER
 void GameObject::Draw()
 {
-	Gizmos::addSphere(data.position, 1.0f, 32, 32, glm::vec4(1,1,1,0));
-	Gizmos::addSphere(localPosition, 0.9f, 32, 32, data.colour);
+	float radius = id < 1000 ? 1.0f : 0.2f;
+	float rez = id < 1000 ? 32 : 12;
+	if (id < 1000)
+		Gizmos::addSphere(data.position, radius*1.0f, rez, rez, glm::vec4(1,1,1,0));
+
+	Gizmos::addSphere(localPosition, radius*0.9f, rez, rez, data.colour);
 
 }
 #endif

@@ -28,6 +28,9 @@ public:
 	void onSetClientIDPacket(RakNet::Packet* packet);
 	void sendClientGameObject();
 	void onReceivedClientDataPacket(RakNet::Packet * packet);
+	void onDespawn(RakNet::Packet * packet);
+
+	void sendSpawnBulletPacket();
 
 protected:
 
@@ -41,4 +44,6 @@ protected:
 
 	glm::mat4	m_viewMatrix;
 	glm::mat4	m_projectionMatrix;
+
+	bool wasKeyDown;
 };

@@ -81,6 +81,13 @@ void Client::update(float deltaTime) {
 	if (input->isKeyDown(aie::INPUT_KEY_DOWN))
 		velocity.z = speed;
 
+	// spawn a bullet on the frame the key was pressed
+	bool keyDown = input->isKeyDown(aie::INPUT_KEY_SPACE);
+	if (!wasKeyDown && keyDown)
+		this->sendSpawnBulletPacket();
+	wasKeyDown = keyDown;
+
+
 	bool velocityChanged = (velocity != m_myGameObject.data.velocity);
 	m_myGameObject.data.velocity = velocity;
 	m_myGameObject.localPosition += m_myGameObject.data.velocity * deltaTime;
@@ -183,6 +190,9 @@ void Client::handleNetworkMessages()
 		case ID_CLIENT_CLIENT_DATA:
 			onReceivedClientDataPacket(packet);
 			break;
+		case ID_SERVER_DESPAWN:
+			onDespawn(packet);
+			break;
 		default:
 			std::cout << "Received a message with a unknown id: " << packet->data[0];
 			break;
@@ -205,6 +215,20 @@ void Client::sendClientGameObject()
 	std::cout << "Writing gameobject at: " << m_myGameObject.data.position.x <<
 		" " << m_myGameObject.data.position.z << std::endl;
 	m_myGameObject.Write(m_pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+}
+
+void Client::sendSpawnBulletPacket()
+{
+	RakNet::BitStream bs;
+	bs.Write((RakNet::MessageID)GameMessages::ID_CLIENT_SPAWN_BULLET);
+
+	glm::vec3 spawnVelocity = glm::vec3(0,0,1);
+	glm::vec3 spawnPos = m_myGameObject.data.position + spawnVelocity;
+	
+	bs.Write((char*)&spawnPos, sizeof(glm::vec3));
+	bs.Write((char*)&spawnVelocity, sizeof(glm::vec3));
+	m_pPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0,
+		RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
 void Client::onReceivedClientDataPacket(RakNet::Packet * packet)
@@ -233,4 +257,13 @@ void Client::onReceivedClientDataPacket(RakNet::Packet * packet)
 			" at: " << clientData.data.position.x <<
 			" " << clientData.data.position.z << std::endl;
 	}
+}
+
+void Client::onDespawn(RakNet::Packet * packet)
+{
+	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	bsIn.IgnoreBytes(sizeof(RakNet::MessageID));
+	int id;
+	bsIn.Read(id);
+	m_otherClientGameObjects.erase(id);
 }
