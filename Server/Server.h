@@ -18,6 +18,8 @@ public:
 	void SpawnObject(glm::vec3 position, glm::vec3 velocity);
 	void Despawn(int id);
 
+	float GetElapsedTime();
+
 	const unsigned short PORT = 5456;
 
 	RakNet::RakPeerInterface* pPeerInterface = nullptr;
@@ -25,4 +27,7 @@ public:
 	int nextServerID = 1000;
 
 	std::map<int, GameObject> m_gameObjects;
+
+	// timing variables
+	LARGE_INTEGER LastTime;
 };

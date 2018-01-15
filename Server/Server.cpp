@@ -17,7 +17,7 @@ void Server::StartUp()
 	//Now call startup - max of 32 connections, on the assigned port
 	pPeerInterface->Startup(32, &sd, 1);
 	pPeerInterface->SetMaximumIncomingConnections(32);
-
+	pPeerInterface->ApplyNetworkSimulator(0.01f, 100, 100);
 	//Startup a thread to ping clients every second
 	std::thread pingThread(SendClientPing, pPeerInterface);
 	std::thread updateThread(UpdateThread, this, pPeerInterface);
@@ -124,31 +124,67 @@ void Server::SendClientPing(RakNet::RakPeerInterface* pPeerInterface)
 	}
 }
 
+float Server::GetElapsedTime()
+{
+	LARGE_INTEGER CurrentTime, ElapsedMicroseconds;
+	LARGE_INTEGER Frequency;
+
+	QueryPerformanceFrequency(&Frequency);
+	QueryPerformanceCounter(&CurrentTime);
+
+	ElapsedMicroseconds.QuadPart = CurrentTime.QuadPart - LastTime.QuadPart;
+	LastTime = CurrentTime;
+
+	//
+	// We now have the elapsed number of ticks, along with the
+	// number of ticks-per-second. We use these values
+	// to convert to the number of elapsed microseconds.
+	// To guard against loss-of-precision, we convert
+	// to microseconds *before* dividing by ticks-per-second.
+	//
+
+	ElapsedMicroseconds.QuadPart *= 1000000;
+	ElapsedMicroseconds.QuadPart /= Frequency.QuadPart;
+	return ElapsedMicroseconds.QuadPart * 0.000001f;
+}
+
 void Server::UpdateThread(Server* server, RakNet::RakPeerInterface* pPeerInterface)
 {
 	const int deltaTime = 17;
+	float timeToNextUpdate = 0; // copuntdown in seconds till we broadcast all game objects
+	float updateFrequency = 0.5f; // second between updates
+
 	while (true)
 	{
 		std::vector<int> deathRow;
-		// every 60 seconds update all gameObjects
+
+		float dt = server->GetElapsedTime();
+		timeToNextUpdate -= dt;
+
 		for (int i = 0; i < server->m_gameObjects.size(); i++)
 		{
-			server->m_gameObjects[i].Update(deltaTime*0.001f);
+			server->m_gameObjects[i].Update(dt);
 
 			//check for despawn
 			glm::vec3 pos = server->m_gameObjects[i].data.position;
 			if (pos.x < -10 || pos.x > 10 || pos.z < -10 || pos.z > 10)
 				deathRow.push_back(server->m_gameObjects[i].id);
 
-			// broadcast to every client if we're server controlled
-			if (server->m_gameObjects[i].id >= 1000)
-				server->m_gameObjects[i].Write(pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+			if (timeToNextUpdate < 0)
+			{
+				// broadcast to every client if we're server controlled
+				if (server->m_gameObjects[i].id >= 1000)
+					server->m_gameObjects[i].Write(pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+			}
 		}
+
+		if (timeToNextUpdate < 0)
+			timeToNextUpdate = updateFrequency;
 
 		for (int i = 0; i < deathRow.size(); i++)
 			server->Despawn(deathRow[i]);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(17));
+		std::this_thread::sleep_for(std::chrono::milliseconds(deltaTime));
 	}
 }
 

@@ -45,5 +45,9 @@ protected:
 	glm::mat4	m_viewMatrix;
 	glm::mat4	m_projectionMatrix;
 
+	glm::vec3   facing;
+
 	bool wasKeyDown;
+
+
 };

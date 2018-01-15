@@ -27,7 +27,7 @@ bool Client::startup() {
 	setBackgroundColour(0.25f, 0.25f, 0.25f);
 
 	// initialise gizmo primitive counts
-	Gizmos::create(10000, 10000, 10000, 10000);
+	Gizmos::create(1000000, 100000, 100, 100);
 
 	// create simple camera transforms
 	m_viewMatrix = glm::lookAt(vec3(10), vec3(0), vec3(0, 1, 0));
@@ -39,6 +39,8 @@ bool Client::startup() {
 
 	m_myGameObject.data.position = glm::vec3(0, 0, 0);
 	m_myGameObject.data.colour = glm::vec4(1, 0, 0, 1);
+
+	facing = glm::vec3(1, 0, 0);
 
 	return true;
 }
@@ -80,6 +82,9 @@ void Client::update(float deltaTime) {
 
 	if (input->isKeyDown(aie::INPUT_KEY_DOWN))
 		velocity.z = speed;
+
+	if (glm::length(velocity) > 0.1f)
+		facing = glm::normalize(velocity);
 
 	// spawn a bullet on the frame the key was pressed
 	bool keyDown = input->isKeyDown(aie::INPUT_KEY_SPACE);
@@ -143,6 +148,8 @@ void Client::initialiseClientConnection()
 	{
 		std::cout << "Unable to start connection, Error number: " << res << std::endl;
 	}
+
+	m_pPeerInterface->ApplyNetworkSimulator(0.01f, 100, 100);
 }
 
 void Client::handleNetworkMessages()
@@ -222,8 +229,8 @@ void Client::sendSpawnBulletPacket()
 	RakNet::BitStream bs;
 	bs.Write((RakNet::MessageID)GameMessages::ID_CLIENT_SPAWN_BULLET);
 
-	glm::vec3 spawnVelocity = glm::vec3(0,0,1);
-	glm::vec3 spawnPos = m_myGameObject.data.position + spawnVelocity;
+	glm::vec3 spawnVelocity = facing * 5;
+	glm::vec3 spawnPos = m_myGameObject.data.position + facing;
 	
 	bs.Write((char*)&spawnPos, sizeof(glm::vec3));
 	bs.Write((char*)&spawnVelocity, sizeof(glm::vec3));
