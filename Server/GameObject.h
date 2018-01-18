@@ -31,5 +31,7 @@ public:
 
 	void Update(float dt);
 
-	void Draw();
+#ifndef NETWORK_SERVER
+	virtual void Draw();
+#endif
 };

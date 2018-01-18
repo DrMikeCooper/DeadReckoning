@@ -1,8 +1,8 @@
-#include "Client.h"
+#include "ExampleClient.h"
 
 int main() {
 	
-	auto app = new Client();
+	auto app = new ExampleClient();
 	app->run("AIE", 800, 600, false);
 	delete app;
 

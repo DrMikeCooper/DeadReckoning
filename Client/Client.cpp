@@ -37,8 +37,9 @@ bool Client::startup() {
 
 	handleNetworkConnection();
 
-	m_myGameObject.data.position = glm::vec3(0, 0, 0);
-	m_myGameObject.data.colour = glm::vec4(1, 0, 0, 1);
+	m_myGameObject = CreateGameObject();
+	m_myGameObject->data.position = glm::vec3(0, 0, 0);
+	m_myGameObject->data.colour = glm::vec4(1, 0, 0, 1);
 
 	facing = glm::vec3(1, 0, 0);
 
@@ -93,22 +94,22 @@ void Client::update(float deltaTime) {
 	wasKeyDown = keyDown;
 
 
-	bool velocityChanged = (velocity != m_myGameObject.data.velocity);
-	m_myGameObject.data.velocity = velocity;
-	m_myGameObject.localPosition += m_myGameObject.data.velocity * deltaTime;
-	m_myGameObject.data.position = m_myGameObject.localPosition;
+	bool velocityChanged = (velocity != m_myGameObject->data.velocity);
+	m_myGameObject->data.velocity = velocity;
+	m_myGameObject->localPosition += m_myGameObject->data.velocity * deltaTime;
+	m_myGameObject->data.position = m_myGameObject->localPosition;
 
 	if (velocityChanged)
 	{
 		sendClientGameObject();
 	}
 
-	m_myGameObject.Draw();
+	m_myGameObject->Draw();
 
 	for (auto& otherClient : m_otherClientGameObjects)
 	{
-		otherClient.second.Update(deltaTime);
-		otherClient.second.Draw();
+		otherClient.second->Update(deltaTime);
+		otherClient.second->Draw();
 	}
 
 }
@@ -211,17 +212,17 @@ void Client::onSetClientIDPacket(RakNet::Packet* packet)
 {
 	RakNet::BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(RakNet::MessageID));
-	bsIn.Read(m_myGameObject.id);
-	std::cout << "Set my client ID to: " << m_myGameObject.id << std::endl;
+	bsIn.Read(m_myGameObject->id);
+	std::cout << "Set my client ID to: " << m_myGameObject->id << std::endl;
 
-	m_myGameObject.data.colour = GameObject::GetColour(m_myGameObject.id);
+	m_myGameObject->data.colour = GameObject::GetColour(m_myGameObject->id);
 }
 
 void Client::sendClientGameObject()
 {
-	std::cout << "Writing gameobject at: " << m_myGameObject.data.position.x <<
-		" " << m_myGameObject.data.position.z << std::endl;
-	m_myGameObject.Write(m_pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+	std::cout << "Writing gameobject at: " << m_myGameObject->data.position.x <<
+		" " << m_myGameObject->data.position.z << std::endl;
+	m_myGameObject->Write(m_pPeerInterface, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
 void Client::sendSpawnBulletPacket()
@@ -230,7 +231,7 @@ void Client::sendSpawnBulletPacket()
 	bs.Write((RakNet::MessageID)GameMessages::ID_CLIENT_SPAWN_BULLET);
 
 	glm::vec3 spawnVelocity = facing * 5;
-	glm::vec3 spawnPos = m_myGameObject.data.position + facing;
+	glm::vec3 spawnPos = m_myGameObject->data.position + facing;
 	
 	bs.Write((char*)&spawnPos, sizeof(glm::vec3));
 	bs.Write((char*)&spawnVelocity, sizeof(glm::vec3));
@@ -246,17 +247,22 @@ void Client::onReceivedClientDataPacket(RakNet::Packet * packet)
 	bsIn.Read(clientID);
 	//If the clientID does not match our ID, we need to update
 	//our client GameObject information.
-	std::cout << "clientID:" << clientID << " my ID:" << m_myGameObject.id << std::endl;
-	if (clientID != m_myGameObject.id)
+	std::cout << "clientID:" << clientID << " my ID:" << m_myGameObject->id << std::endl;
+	if (clientID != m_myGameObject->id)
 	{
 		GameObject clientData;
 		clientData.Read(packet);
 
 		if (m_otherClientGameObjects.count(clientID) == 0)
+		{
+			m_otherClientGameObjects[clientID] = CreateGameObject();
 			clientData.localPosition = clientData.data.position;
+		}
 		else
-			clientData.localPosition = m_otherClientGameObjects[clientID].localPosition;
-		m_otherClientGameObjects[clientID] = clientData;
+		{
+			clientData.localPosition = m_otherClientGameObjects[clientID]->localPosition;
+		}
+		*m_otherClientGameObjects[clientID] = clientData;
 
 		//For now, just output the Game Object information to the
 		//console

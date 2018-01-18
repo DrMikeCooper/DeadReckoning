@@ -32,15 +32,20 @@ public:
 
 	void sendSpawnBulletPacket();
 
+	virtual GameObject* CreateGameObject()
+	{
+		return new GameObject();
+	}
+
 protected:
 
 	RakNet::RakPeerInterface* m_pPeerInterface;
 	const char* IP = "127.0.0.1";
 	const unsigned short PORT = 5456;
 
-	GameObject m_myGameObject;
+	GameObject* m_myGameObject;
 
-	std::unordered_map<int, GameObject> m_otherClientGameObjects;
+	std::unordered_map<int, GameObject*> m_otherClientGameObjects;
 
 	glm::mat4	m_viewMatrix;
 	glm::mat4	m_projectionMatrix;
